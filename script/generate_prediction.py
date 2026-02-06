@@ -11,6 +11,8 @@ from my_util import *
 
 torch.manual_seed(0)
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 arg = argparse.ArgumentParser()
 
 arg.add_argument('-dataset',type=str, default='activemq', help='software project name (lowercase)')
@@ -83,16 +85,16 @@ def predict_defective_files_in_releases(dataset_name, target_epochs):
         dropout=dropout)
 
     if exp_name == '':
-        checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+target_epochs+'epochs.pth')
+        checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+target_epochs+'epochs.pth', map_location=device)
 
     else:
-        checkpoint = torch.load(actual_save_model_dir+exp_name+'/checkpoint_'+target_epochs+'epochs.pth')
+        checkpoint = torch.load(actual_save_model_dir+exp_name+'/checkpoint_'+target_epochs+'epochs.pth', map_location=device)
 
     model.load_state_dict(checkpoint['model_state_dict'])
 
     model.sent_attention.word_attention.freeze_embeddings(True)
 
-    model = model.cuda()
+    model = model.to(device)
     model.eval()
 
     for rel in test_rel:

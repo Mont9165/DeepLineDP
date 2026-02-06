@@ -31,7 +31,8 @@ class HierarchicalAttentionNetwork(nn.Module):
         self.dropout = dropout
 
     def forward(self, code_tensor):
-        
+        device = next(self.parameters()).device
+
         code_lengths = []
         sent_lengths = []
 
@@ -41,10 +42,10 @@ class HierarchicalAttentionNetwork(nn.Module):
             for line in file:
                 code_line.append(len(line))
             sent_lengths.append(code_line)
-        
-        code_tensor = code_tensor.type(torch.LongTensor)
-        code_lengths = torch.tensor(code_lengths).type(torch.LongTensor).cuda()
-        sent_lengths = torch.tensor(sent_lengths).type(torch.LongTensor).cuda()
+
+        code_tensor = code_tensor.type(torch.LongTensor).to(device)
+        code_lengths = torch.tensor(code_lengths, dtype=torch.long, device=device)
+        sent_lengths = torch.tensor(sent_lengths, dtype=torch.long, device=device)
         
         code_embeds, word_att_weights, sent_att_weights, sents = self.sent_attention(code_tensor, code_lengths, sent_lengths)
 
@@ -194,7 +195,7 @@ class WordAttention(nn.Module):
         sent_lengths, sent_perm_idx = sent_lengths.sort(dim=0, descending=True)
         sents = sents[sent_perm_idx]
 
-        sents = self.embeddings(sents.cuda())
+        sents = self.embeddings(sents.to(self.embeddings.weight.device))
 
         packed_words = pack_padded_sequence(sents, lengths=sent_lengths.tolist(), batch_first=True)
 

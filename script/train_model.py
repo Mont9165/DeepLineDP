@@ -16,6 +16,8 @@ from my_util import *
 
 torch.manual_seed(0)
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 arg = argparse.ArgumentParser()
 
 arg.add_argument('-dataset',type=str, default='activemq', help='software project name (lowercase)')
@@ -75,7 +77,7 @@ def get_loss_weight(labels):
         else:
             weight_list.append(weight_dict['defect'])
 
-    weight_tensor = torch.tensor(weight_list).reshape(-1,1).cuda()
+    weight_tensor = torch.tensor(weight_list).reshape(-1,1).to(device)
     return weight_tensor
 
 def train_model(dataset_name):
@@ -139,7 +141,7 @@ def train_model(dataset_name):
         use_layer_norm=use_layer_norm,
         dropout=dropout)
 
-    model = model.cuda()
+    model = model.to(device)
     model.sent_attention.word_attention.freeze_embeddings(False)
 
     optimizer = optim.Adam(params=filter(lambda p: p.requires_grad, model.parameters()), lr=lr)
@@ -165,7 +167,7 @@ def train_model(dataset_name):
         checkpoint_nums = [int(re.findall('\d+',s)[0]) for s in checkpoint_files]
         current_checkpoint_num = max(checkpoint_nums)
 
-        checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+str(current_checkpoint_num)+'epochs.pth')
+        checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+str(current_checkpoint_num)+'epochs.pth', map_location=device)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         
@@ -184,7 +186,7 @@ def train_model(dataset_name):
 
         for inputs, labels in train_dl:
 
-            inputs_cuda, labels_cuda = inputs.cuda(), labels.cuda()
+            inputs_cuda, labels_cuda = inputs.to(device), labels.to(device)
             output, _, __, ___ = model(inputs_cuda)
 
             weight_tensor = get_loss_weight(labels)
@@ -213,7 +215,7 @@ def train_model(dataset_name):
             
             for inputs, labels in valid_dl:
 
-                inputs, labels = inputs.cuda(), labels.cuda()
+                inputs, labels = inputs.to(device), labels.to(device)
                 output, _, __, ___ = model(inputs)
             
                 val_loss = criterion(output, labels.reshape(batch_size,1))
