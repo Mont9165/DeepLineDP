@@ -42,7 +42,7 @@ def get_DeepLineDP_and_W2V(dataset_name):
     word2vec = Word2Vec.load('../'+word2vec_file_dir)
     print('load Word2Vec for',dataset_name,'finished')
 
-    total_vocab = len(word2vec.wv.vocab)
+    total_vocab = len(word2vec.wv)
 
     vocab_size = total_vocab +1 # for unknown tokens
     

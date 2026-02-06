@@ -116,7 +116,7 @@ def train_model(dataset_name):
 
     word2vec_weights = get_w2v_weight_for_deep_learning_models(word2vec, embed_dim)
 
-    vocab_size = len(word2vec.wv.vocab)  + 1 # for unknown tokens
+    vocab_size = len(word2vec.wv)  + 1 # for unknown tokens
 
     x_train_vec = get_x_vec(train_code3d, word2vec)
     x_valid_vec = get_x_vec(valid_code3d, word2vec)

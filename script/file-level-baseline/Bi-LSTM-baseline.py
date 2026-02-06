@@ -140,9 +140,9 @@ def train_model(dataset_name):
 
     word2vec_model = Word2Vec.load(w2v_dir)
 
-    padding_idx = word2vec_model.wv.vocab['<pad>'].index
+    padding_idx = word2vec_model.wv.key_to_index['<pad>']
 
-    vocab_size = len(word2vec_model.wv.vocab)+1
+    vocab_size = len(word2vec_model.wv)+1
         
     train_dl = get_dataloader(word2vec_model, train_code,train_label, padding_idx, batch_size)
     valid_dl = get_dataloader(word2vec_model, valid_code,valid_label, padding_idx, batch_size)
@@ -261,7 +261,7 @@ def predict_defective_files_in_releases(dataset_name, target_epochs = 6):
 
     word2vec_model = Word2Vec.load(w2v_dir)
     
-    vocab_size = len(word2vec_model.wv.vocab) + 1
+    vocab_size = len(word2vec_model.wv) + 1
 
     net = LSTMClassifier(1, hidden_dim, vocab_size, embed_dim)
 

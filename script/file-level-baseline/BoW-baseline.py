@@ -58,7 +58,7 @@ def train_model(dataset_name):
     print('finished training model for',dataset_name)
 
     count_vec_df = pd.DataFrame(X)
-    count_vec_df.columns = vectorizer.get_feature_names()
+    count_vec_df.columns = vectorizer.get_feature_names_out()
     
 
 # test_release is str

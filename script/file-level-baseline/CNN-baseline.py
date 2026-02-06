@@ -141,16 +141,16 @@ def train_model(dataset_name):
 
     word2vec_model = Word2Vec.load(w2v_dir)
     
-    vocab_size = len(word2vec_model.wv.vocab)  + 1 # for unknown tokens
+    vocab_size = len(word2vec_model.wv)  + 1 # for unknown tokens
 
     train_code, train_label = prepare_data(train_df, to_lowercase = True)
     valid_code, valid_label = prepare_data(valid_df, to_lowercase = True)
 
     word2vec_model = Word2Vec.load(w2v_dir)
 
-    padding_idx = word2vec_model.wv.vocab['<pad>'].index
+    padding_idx = word2vec_model.wv.key_to_index['<pad>']
 
-    vocab_size = len(word2vec_model.wv.vocab)+1
+    vocab_size = len(word2vec_model.wv)+1
         
     train_dl = get_dataloader(word2vec_model, train_code,train_label, padding_idx)
     valid_dl = get_dataloader(word2vec_model, valid_code,valid_label, padding_idx)
@@ -273,7 +273,7 @@ def predict_defective_files_in_releases(dataset_name, target_epochs = 100):
 
     word2vec_model = Word2Vec.load(w2v_dir)
     
-    vocab_size = len(word2vec_model.wv.vocab) + 1
+    vocab_size = len(word2vec_model.wv) + 1
 
     net = CNN(batch_size, 1, n_filters, 0.5, vocab_size, embed_dim)
 
