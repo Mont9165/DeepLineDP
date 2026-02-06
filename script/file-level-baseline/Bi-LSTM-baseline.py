@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.optim as optim
 import torch
 from torch.utils.data import DataLoader, TensorDataset
-from torch.autograd import Variable
 
 import numpy as np
 import pandas as pd
@@ -99,8 +98,8 @@ class LSTMClassifier(nn.Module):
 
         # input.size() = (num_sequences, batch_size, embedding_length)
         input = input.permute(1, 0, 2) 
-        h_0 = Variable(torch.zeros(2, self.batch_size, self.hidden_size).cuda()) # Initialize hidden state of the LSTM
-        c_0 = Variable(torch.zeros(2, self.batch_size, self.hidden_size).cuda()) # Initialize cell state of the LSTM
+        h_0 = torch.zeros(2, self.batch_size, self.hidden_size).cuda() # Initialize hidden state of the LSTM
+        c_0 = torch.zeros(2, self.batch_size, self.hidden_size).cuda() # Initialize cell state of the LSTM
 
         lstm_out, (final_hidden_state, final_cell_state) = self.lstm(input, (h_0, c_0))
 
