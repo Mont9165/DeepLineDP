@@ -187,7 +187,7 @@ def train_model(dataset_name):
         net.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         
-        loss_df = pd.read_csv(loss_dir+dataset_name+'-Bi-LSTM-loss_record.csv')
+        loss_df = pd.read_csv(loss_dir+dataset_name+'-CNN-loss_record.csv')
         train_loss_all_epochs = list(loss_df['train_loss'])
         val_loss_all_epochs = list(loss_df['valid_loss'])
 
