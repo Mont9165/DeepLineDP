@@ -208,6 +208,7 @@ def train_model(
         ckpt = torch.load(
             os.path.join(model_dir, f"checkpoint_{max(nums)}epochs.pth"),
             map_location=device,
+            weights_only=False,
         )
         model.load_state_dict(ckpt["model_state_dict"])
 
@@ -335,7 +336,7 @@ def generate_predictions(
         dropout=0.2,
     )
 
-    checkpoint = torch.load(model_path, map_location=device)
+    checkpoint = torch.load(model_path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.sent_attention.word_attention.freeze_embeddings(True)
     model = model.to(device)

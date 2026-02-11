@@ -107,10 +107,10 @@ def predict_defective_files_in_releases(dataset_name, target_epochs):
         dropout=dropout)
 
     if exp_name == '':
-        checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+target_epochs+'epochs.pth', map_location=device)
+        checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+target_epochs+'epochs.pth', map_location=device, weights_only=False)
 
     else:
-        checkpoint = torch.load(actual_save_model_dir+exp_name+'/checkpoint_'+target_epochs+'epochs.pth', map_location=device)
+        checkpoint = torch.load(actual_save_model_dir+exp_name+'/checkpoint_'+target_epochs+'epochs.pth', map_location=device, weights_only=False)
 
     model.load_state_dict(checkpoint['model_state_dict'])
 

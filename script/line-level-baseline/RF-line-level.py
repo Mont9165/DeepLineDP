@@ -60,7 +60,7 @@ def get_DeepLineDP_and_W2V(dataset_name):
         use_layer_norm=use_layer_norm,
         dropout=0.001)
 
-    checkpoint = torch.load('../../output/model/DeepLineDP/'+dataset_name+'/checkpoint_7epochs.pth', map_location=device)
+    checkpoint = torch.load('../../output/model/DeepLineDP/'+dataset_name+'/checkpoint_7epochs.pth', map_location=device, weights_only=False)
 
 
     model.load_state_dict(checkpoint['model_state_dict'])

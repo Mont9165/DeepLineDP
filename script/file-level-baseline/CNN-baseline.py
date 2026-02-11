@@ -97,7 +97,7 @@ class CNN(nn.Module):
 
         '''
         # input.size() = (batch_size, num_seq, embedding_length)
-        input = self.word_embeddings(input_tensor.type(torch.LongTensor).to(self.word_embeddings.weight.device))
+        input = self.word_embeddings(input_tensor.to(device=self.word_embeddings.weight.device, dtype=torch.long))
         
         # input.size() = (batch_size, 1, num_seq, embedding_length)
         input = input.unsqueeze(1)
@@ -183,7 +183,7 @@ def train_model(dataset_name):
         checkpoint_nums = [int(re.findall('\d+',s)[0]) for s in checkpoint_files]
         current_checkpoint_num = max(checkpoint_nums)
 
-        checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+str(current_checkpoint_num)+'epochs.pth', map_location=device)
+        checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+str(current_checkpoint_num)+'epochs.pth', map_location=device, weights_only=False)
         net.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         
@@ -278,7 +278,7 @@ def predict_defective_files_in_releases(dataset_name, target_epochs = 100):
 
     net = CNN(batch_size, 1, n_filters, 0.5, vocab_size, embed_dim)
 
-    checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+target_epochs+'epochs.pth', map_location=device)
+    checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+target_epochs+'epochs.pth', map_location=device, weights_only=False)
 
     net.load_state_dict(checkpoint['model_state_dict'])
 

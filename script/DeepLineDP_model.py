@@ -43,7 +43,7 @@ class HierarchicalAttentionNetwork(nn.Module):
                 code_line.append(len(line))
             sent_lengths.append(code_line)
 
-        code_tensor = code_tensor.type(torch.LongTensor).to(device)
+        code_tensor = code_tensor.to(device=device, dtype=torch.long)
         code_lengths = torch.tensor(code_lengths, dtype=torch.long, device=device)
         sent_lengths = torch.tensor(sent_lengths, dtype=torch.long, device=device)
         
