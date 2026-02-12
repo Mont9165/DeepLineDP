@@ -8,7 +8,9 @@ Produces:
     - agent_data/   — BICs authored by AI agents
     - human_data/   — BICs authored by humans
     - mixed_data/   — all BICs combined
-    Each directory has temporal train/eval/test split CSVs.
+    Each directory has cross-project train/eval/test split CSVs.
+    A global repo-to-split assignment is computed once from all entries
+    so no repository appears in different splits across groups.
 
 Usage:
     python build_dataset_from_llm4szz.py --output ../datasets/preprocessed_data/
@@ -253,34 +255,107 @@ def build_file_data(
     return dfs
 
 
-def temporal_split(
+def assign_repo_splits(
     entries: List[Dict],
     train_ratio: float = 0.6,
     eval_ratio: float = 0.2,
+) -> Dict[str, str]:
+    """
+    Compute a global repository-to-split assignment from ALL entries.
+
+    Returns a dict mapping repo_name → "train" | "eval" | "test".
+
+    Repositories are sorted by their median commit date so that the
+    training set contains generally older projects and the test set
+    contains newer ones.  The assignment is computed once from the full
+    (mixed) entry list and is then applied identically to every author
+    group, guaranteeing that no repository appears in different splits
+    across cross-domain scenarios (e.g. Human→Agent).
+
+    Requires at least 3 distinct repositories so that each split can
+    contain at least one repo.
+    """
+    if not (0 < train_ratio < 1 and 0 < eval_ratio < 1 and train_ratio + eval_ratio < 1):
+        raise ValueError(f"Invalid ratios: train={train_ratio}, eval={eval_ratio}")
+
+    # Group entries by repository
+    repo_entries: Dict[str, List[Dict]] = {}
+    for e in entries:
+        repo_entries.setdefault(e["repo_name"], []).append(e)
+
+    if len(repo_entries) < 3:
+        raise ValueError(
+            f"Cross-project split requires at least 3 repositories, "
+            f"but only {len(repo_entries)} found: {list(repo_entries.keys())}"
+        )
+
+    # Sort repos by median commit date, breaking ties by name for determinism.
+    # Repos without dates go first → train.
+    def _median_date(elist):
+        dates = [e["commit_date"] for e in elist if e["commit_date"] is not None]
+        if not dates:
+            return datetime.min
+        dates.sort()
+        return dates[len(dates) // 2]
+
+    sorted_repos = sorted(repo_entries.keys(), key=lambda r: (_median_date(repo_entries[r]), r))
+
+    # Assign repos to splits so cumulative entry count approximates the ratios
+    total = len(entries)
+    train_target = int(total * train_ratio)
+    eval_target = int(total * (train_ratio + eval_ratio))
+
+    repo_split: Dict[str, str] = {}
+    running = 0
+    for repo in sorted_repos:
+        if running < train_target:
+            repo_split[repo] = "train"
+        elif running < eval_target:
+            repo_split[repo] = "eval"
+        else:
+            repo_split[repo] = "test"
+        running += len(repo_entries[repo])
+
+    # Ensure eval and test are non-empty by reassigning the last train repo
+    splits_used = set(repo_split.values())
+    if "eval" not in splits_used:
+        train_repos = [r for r in sorted_repos if repo_split[r] == "train"]
+        if len(train_repos) > 1:
+            repo_split[train_repos[-1]] = "eval"
+    splits_used = set(repo_split.values())
+    if "test" not in splits_used:
+        eval_repos = [r for r in sorted_repos if repo_split[r] == "eval"]
+        if len(eval_repos) > 1:
+            repo_split[eval_repos[-1]] = "test"
+
+    # Summary
+    split_counts = {"train": 0, "eval": 0, "test": 0}
+    for s in repo_split.values():
+        split_counts[s] += 1
+    print(f"  Global repo assignment: {split_counts['train']} train repos, "
+          f"{split_counts['eval']} eval repos, {split_counts['test']} test repos")
+
+    return repo_split
+
+
+def apply_repo_splits(
+    entries: List[Dict],
+    repo_splits: Dict[str, str],
 ) -> Tuple[List[Dict], List[Dict], List[Dict]]:
     """
-    Split entries into train/eval/test by commit date.
+    Partition entries into (train, eval, test) using a pre-computed repo assignment.
 
-    Entries without dates are placed in training.
+    Entries whose repo_name is absent from *repo_splits* are silently dropped.
     """
-    with_date = [e for e in entries if e["commit_date"] is not None]
-    without_date = [e for e in entries if e["commit_date"] is None]
-
-    if without_date:
-        print(f"  Warning: {len(without_date)}/{len(entries)} entries have no date "
-              f"and will be placed in training set")
-
-    # Sort by date
-    with_date.sort(key=lambda e: e["commit_date"])
-
-    n = len(with_date)
-    train_end = int(n * train_ratio)
-    eval_end = int(n * (train_ratio + eval_ratio))
-
-    train = without_date + with_date[:train_end]
-    eval_ = with_date[train_end:eval_end]
-    test = with_date[eval_end:]
-
+    train, eval_, test = [], [], []
+    for e in entries:
+        split = repo_splits.get(e["repo_name"])
+        if split == "train":
+            train.append(e)
+        elif split == "eval":
+            eval_.append(e)
+        elif split == "test":
+            test.append(e)
     return train, eval_, test
 
 
@@ -391,6 +466,12 @@ def build_datasets(
         "datasets": {},
     }
 
+    # Compute a single global repo-to-split mapping from ALL entries.
+    # This ensures no repository appears in different splits across
+    # cross-domain scenarios (e.g. Human→Agent), preventing data leaking.
+    print("\nComputing global cross-project repo assignment...")
+    repo_splits = assign_repo_splits(entries)
+
     # Build datasets for each author group
     groups = {
         "agent_data": agent_entries,
@@ -409,8 +490,13 @@ def build_datasets(
         group_dir = os.path.join(output_base, group_name)
         os.makedirs(group_dir, exist_ok=True)
 
-        train, eval_, test = temporal_split(group_entries)
-        print(f"  Temporal split: train={len(train)}, eval={len(eval_)}, test={len(test)}")
+        train, eval_, test = apply_repo_splits(group_entries, repo_splits)
+        print(f"  Cross-project split: train={len(train)}, eval={len(eval_)}, test={len(test)}")
+
+        if not train or not eval_ or not test:
+            empty = [s for s, v in [("train", train), ("eval", eval_), ("test", test)] if not v]
+            print(f"  WARNING: {group_name} has empty split(s): {empty}. "
+                  "Cross-domain evaluation for this group may not be possible.")
 
         split_info = {}
         for split_name, split_entries in [("train", train), ("eval", eval_), ("test", test)]:
