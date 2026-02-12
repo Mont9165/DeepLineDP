@@ -10,6 +10,7 @@ from gensim.models import Word2Vec
 
 from tqdm import tqdm
 
+import baseline_util
 from baseline_util import *
 
 sys.path.append('../')
@@ -153,8 +154,8 @@ def train_model(dataset_name):
 
     vocab_size = len(word2vec_model.wv)+1
         
-    train_dl = get_dataloader(word2vec_model, train_code,train_label, padding_idx)
-    valid_dl = get_dataloader(word2vec_model, valid_code,valid_label, padding_idx)
+    train_dl = baseline_util.get_dataloader(word2vec_model, train_code, train_label, padding_idx, batch_size)
+    valid_dl = baseline_util.get_dataloader(word2vec_model, valid_code, valid_label, padding_idx, batch_size)
 
     net = CNN(batch_size, 1, n_filters, 0.5, vocab_size, embed_dim)
 
