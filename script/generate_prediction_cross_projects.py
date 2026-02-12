@@ -9,8 +9,9 @@ from tqdm import tqdm
 from DeepLineDP_model import *
 from my_util import *
 
-torch.manual_seed(0) 
+torch.manual_seed(0)
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 all_eval_rels_cross_projects = {
     'activemq': ['camel-2.10.0', 'camel-2.11.0', 'derby-10.5.1.1', 'groovy-1_6_BETA_2', 'hbase-0.95.2', 'hive-0.12.0', 'jruby-1.5.0', 'jruby-1.7.0.preview1', 'lucene-3.0.0', 'lucene-3.1', 'wicket-1.5.3'], 
@@ -85,7 +86,7 @@ def predict_defective_files_in_releases(dataset_name, target_epochs):
     word2vec = Word2Vec.load(word2vec_file_dir)
     print('load Word2Vec for',dataset_name,'finished')
 
-    total_vocab = len(word2vec.wv.vocab)
+    total_vocab = len(word2vec.wv)
 
     vocab_size = total_vocab +1 # for unknown tokens
 
@@ -106,16 +107,16 @@ def predict_defective_files_in_releases(dataset_name, target_epochs):
         dropout=dropout)
 
     if exp_name == '':
-        checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+target_epochs+'epochs.pth')
+        checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+target_epochs+'epochs.pth', map_location=device, weights_only=False)
 
     else:
-        checkpoint = torch.load(actual_save_model_dir+exp_name+'/checkpoint_'+target_epochs+'epochs.pth')
+        checkpoint = torch.load(actual_save_model_dir+exp_name+'/checkpoint_'+target_epochs+'epochs.pth', map_location=device, weights_only=False)
 
     model.load_state_dict(checkpoint['model_state_dict'])
 
     model.sent_attention.word_attention.freeze_embeddings(True)
 
-    model = model.cuda()
+    model = model.to(device)
     model.eval()
 
     for rel in test_rel:

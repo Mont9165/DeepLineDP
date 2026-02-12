@@ -108,11 +108,13 @@ def get_w2v_path():
 
     return word2vec_dir
 
-def get_w2v_weight_for_deep_learning_models(word2vec_model, embed_dim):
-    word2vec_weights = torch.FloatTensor(word2vec_model.wv.syn0).cuda()
-    
+def get_w2v_weight_for_deep_learning_models(word2vec_model, embed_dim, device=None):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    word2vec_weights = torch.FloatTensor(word2vec_model.wv.vectors).to(device)
+
     # add zero vector for unknown tokens
-    word2vec_weights = torch.cat((word2vec_weights, torch.zeros(1,embed_dim).cuda()))
+    word2vec_weights = torch.cat((word2vec_weights, torch.zeros(1,embed_dim, device=device)))
 
     return word2vec_weights
 
@@ -140,8 +142,10 @@ def pad_code(code_list_3d,max_sent_len,limit_sent_len=True, mode='train'):
         
     return paded
 
-def get_dataloader(code_vec, label_list,batch_size, max_sent_len):
-    y_tensor =  torch.cuda.FloatTensor([label for label in label_list])
+def get_dataloader(code_vec, label_list,batch_size, max_sent_len, device=None):
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    y_tensor =  torch.FloatTensor([label for label in label_list]).to(device)
     code_vec_pad = pad_code(code_vec,max_sent_len)
     tensor_dataset = TensorDataset(torch.tensor(code_vec_pad), y_tensor)
 
@@ -150,7 +154,7 @@ def get_dataloader(code_vec, label_list,batch_size, max_sent_len):
     return dl
 
 def get_x_vec(code_3d, word2vec):
-    x_vec = [[[word2vec.wv.vocab[token].index if token in word2vec.wv.vocab else len(word2vec.wv.vocab) for token in text]
+    x_vec = [[[word2vec.wv.key_to_index[token] if token in word2vec.wv.key_to_index else len(word2vec.wv) for token in text]
          for text in texts] for texts in code_3d]
     
     return x_vec

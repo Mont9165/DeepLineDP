@@ -16,6 +16,8 @@ from my_util import *
 
 torch.manual_seed(0)
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 arg = argparse.ArgumentParser()
 
 arg.add_argument('-dataset',type=str, default='activemq', help='software project name (lowercase)')
@@ -75,7 +77,7 @@ def get_loss_weight(labels):
         else:
             weight_list.append(weight_dict['defect'])
 
-    weight_tensor = torch.tensor(weight_list).reshape(-1,1).cuda()
+    weight_tensor = torch.tensor(weight_list).reshape(-1,1).to(device)
     return weight_tensor
 
 def train_model(dataset_name):
@@ -116,7 +118,7 @@ def train_model(dataset_name):
 
     word2vec_weights = get_w2v_weight_for_deep_learning_models(word2vec, embed_dim)
 
-    vocab_size = len(word2vec.wv.vocab)  + 1 # for unknown tokens
+    vocab_size = len(word2vec.wv)  + 1 # for unknown tokens
 
     x_train_vec = get_x_vec(train_code3d, word2vec)
     x_valid_vec = get_x_vec(valid_code3d, word2vec)
@@ -139,7 +141,7 @@ def train_model(dataset_name):
         use_layer_norm=use_layer_norm,
         dropout=dropout)
 
-    model = model.cuda()
+    model = model.to(device)
     model.sent_attention.word_attention.freeze_embeddings(False)
 
     optimizer = optim.Adam(params=filter(lambda p: p.requires_grad, model.parameters()), lr=lr)
@@ -165,7 +167,7 @@ def train_model(dataset_name):
         checkpoint_nums = [int(re.findall('\d+',s)[0]) for s in checkpoint_files]
         current_checkpoint_num = max(checkpoint_nums)
 
-        checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+str(current_checkpoint_num)+'epochs.pth')
+        checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+str(current_checkpoint_num)+'epochs.pth', map_location=device, weights_only=False)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         
@@ -184,7 +186,7 @@ def train_model(dataset_name):
 
         for inputs, labels in train_dl:
 
-            inputs_cuda, labels_cuda = inputs.cuda(), labels.cuda()
+            inputs_cuda, labels_cuda = inputs.to(device), labels.to(device)
             output, _, __, ___ = model(inputs_cuda)
 
             weight_tensor = get_loss_weight(labels)
@@ -213,7 +215,7 @@ def train_model(dataset_name):
             
             for inputs, labels in valid_dl:
 
-                inputs, labels = inputs.cuda(), labels.cuda()
+                inputs, labels = inputs.to(device), labels.to(device)
                 output, _, __, ___ = model(inputs)
             
                 val_loss = criterion(output, labels.reshape(batch_size,1))

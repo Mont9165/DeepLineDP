@@ -13,6 +13,8 @@ sys.path.append('../')
 from DeepLineDP_model import *
 from my_util import *
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 model_dir = '../../output/model/RF-line-level/'
 result_dir = '../../output/RF-line-level-result/'
 
@@ -42,7 +44,7 @@ def get_DeepLineDP_and_W2V(dataset_name):
     word2vec = Word2Vec.load('../'+word2vec_file_dir)
     print('load Word2Vec for',dataset_name,'finished')
 
-    total_vocab = len(word2vec.wv.vocab)
+    total_vocab = len(word2vec.wv)
 
     vocab_size = total_vocab +1 # for unknown tokens
     
@@ -58,14 +60,14 @@ def get_DeepLineDP_and_W2V(dataset_name):
         use_layer_norm=use_layer_norm,
         dropout=0.001)
 
-    checkpoint = torch.load('../../output/model/DeepLineDP/'+dataset_name+'/checkpoint_7epochs.pth')
+    checkpoint = torch.load('../../output/model/DeepLineDP/'+dataset_name+'/checkpoint_7epochs.pth', map_location=device, weights_only=False)
 
 
     model.load_state_dict(checkpoint['model_state_dict'])
 
     model.sent_attention.word_attention.freeze_embeddings(True)
 
-    model = model.cuda()
+    model = model.to(device)
     model.eval()
 
     return model, word2vec

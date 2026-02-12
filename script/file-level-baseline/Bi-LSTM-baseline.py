@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.optim as optim
 import torch
 from torch.utils.data import DataLoader, TensorDataset
-from torch.autograd import Variable
 
 import numpy as np
 import pandas as pd
@@ -30,6 +29,8 @@ arg.add_argument('-predict',action='store_true')
 args = arg.parse_args()
 
 torch.manual_seed(0)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # model parameters
 
@@ -95,12 +96,12 @@ class LSTMClassifier(nn.Module):
         """
 
         # embedded input of shape = (batch_size, num_sequences,  embedding_length)
-        input = self.word_embeddings(input_tensor.type(torch.LongTensor).cuda()) 
+        input = self.word_embeddings(input_tensor.to(device=self.word_embeddings.weight.device, dtype=torch.long))
 
         # input.size() = (num_sequences, batch_size, embedding_length)
         input = input.permute(1, 0, 2) 
-        h_0 = Variable(torch.zeros(2, self.batch_size, self.hidden_size).cuda()) # Initialize hidden state of the LSTM
-        c_0 = Variable(torch.zeros(2, self.batch_size, self.hidden_size).cuda()) # Initialize cell state of the LSTM
+        h_0 = torch.zeros(2, self.batch_size, self.hidden_size, device=self.word_embeddings.weight.device) # Initialize hidden state of the LSTM
+        c_0 = torch.zeros(2, self.batch_size, self.hidden_size, device=self.word_embeddings.weight.device) # Initialize cell state of the LSTM
 
         lstm_out, (final_hidden_state, final_cell_state) = self.lstm(input, (h_0, c_0))
 
@@ -140,17 +141,17 @@ def train_model(dataset_name):
 
     word2vec_model = Word2Vec.load(w2v_dir)
 
-    padding_idx = word2vec_model.wv.vocab['<pad>'].index
+    padding_idx = word2vec_model.wv.key_to_index['<pad>']
 
-    vocab_size = len(word2vec_model.wv.vocab)+1
+    vocab_size = len(word2vec_model.wv)+1
         
     train_dl = get_dataloader(word2vec_model, train_code,train_label, padding_idx, batch_size)
     valid_dl = get_dataloader(word2vec_model, valid_code,valid_label, padding_idx, batch_size)
 
     net = LSTMClassifier(batch_size, hidden_dim, vocab_size, embed_dim)
 
-    net = net.cuda()
-    
+    net = net.to(device)
+
     optimizer = optim.Adam(params=filter(lambda p: p.requires_grad, net.parameters()), lr=lr)
     criterion = nn.BCELoss()
 
@@ -173,7 +174,7 @@ def train_model(dataset_name):
         checkpoint_nums = [int(re.findall('\d+',s)[0]) for s in checkpoint_files]
         current_checkpoint_num = max(checkpoint_nums)
 
-        checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+str(current_checkpoint_num)+'epochs.pth')
+        checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+str(current_checkpoint_num)+'epochs.pth', map_location=device, weights_only=False)
         net.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         
@@ -198,7 +199,7 @@ def train_model(dataset_name):
 
         for inputs, labels in train_dl:
             
-            inputs, labels = inputs.cuda(), labels.cuda()
+            inputs, labels = inputs.to(device), labels.to(device)
 
             net.zero_grad()
             
@@ -222,7 +223,7 @@ def train_model(dataset_name):
 
             for inputs, labels in valid_dl:
 
-                inputs, labels = inputs.cuda(), labels.cuda()
+                inputs, labels = inputs.to(device), labels.to(device)
                 output = net(inputs)
 
                 val_loss = criterion(output, labels.reshape(batch_size,1).float())
@@ -261,16 +262,16 @@ def predict_defective_files_in_releases(dataset_name, target_epochs = 6):
 
     word2vec_model = Word2Vec.load(w2v_dir)
     
-    vocab_size = len(word2vec_model.wv.vocab) + 1
+    vocab_size = len(word2vec_model.wv) + 1
 
     net = LSTMClassifier(1, hidden_dim, vocab_size, embed_dim)
 
-    checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+target_epochs+'epochs.pth')
+    checkpoint = torch.load(actual_save_model_dir+'checkpoint_'+target_epochs+'epochs.pth', map_location=device, weights_only=False)
 
     net.load_state_dict(checkpoint['model_state_dict'])
 
-    net = net.cuda()
-    
+    net = net.to(device)
+
     net.eval()
     
     

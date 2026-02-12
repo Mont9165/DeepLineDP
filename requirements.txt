@@ -1,0 +1,16 @@
+# DeepLineDP dependencies (Python 3.12 compatible)
+# PyTorch CPU-only (add +cu121 etc. for GPU)
+torch>=2.0.0
+# NLP / Word Embeddings
+gensim>=4.0.0
+# Data processing
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.10.0
+# ML
+scikit-learn>=1.2.0
+imbalanced-learn>=0.10.0
+# Utilities
+tqdm>=4.60.0
+more-itertools>=9.0.0
+pillow>=9.0.0

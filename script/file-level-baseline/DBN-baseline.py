@@ -75,7 +75,7 @@ def train_model(dataset_name):
 
     word2vec_model = Word2Vec.load(w2v_dir)
 
-    padding_idx = word2vec_model.wv.vocab['<pad>'].index
+    padding_idx = word2vec_model.wv.key_to_index['<pad>']
 
     token_idx = convert_to_token_index(word2vec_model, train_code, padding_idx)
 
@@ -123,7 +123,7 @@ def predict_defective_files_in_releases(dataset_name):
     # find max sequence from training data (for later padding)
     max_seq_len = min(max([len(cv) for cv in train_codevec]),45000)    
 
-    padding_idx = word2vec_model.wv.vocab['<pad>'].index
+    padding_idx = word2vec_model.wv.key_to_index['<pad>']
 
     token_idx = convert_to_token_index(word2vec_model, train_code, padding_idx)
 
