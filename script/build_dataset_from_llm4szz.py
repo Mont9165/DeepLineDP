@@ -213,8 +213,10 @@ def build_file_data(
         if not code:
             continue
 
+        # Prefix with repo_name to disambiguate identical paths across repos
+        prefixed_name = f"{repo_name}/{file_name}"
         df = preprocess_file(
-            code, file_name,
+            code, prefixed_name,
             file_label=True,
             buggy_lines=line_numbers,
         )
@@ -248,7 +250,8 @@ def build_file_data(
                 if not code or len(code) > 100_000:  # Skip very large files
                     continue
 
-                df = preprocess_file(code, file_name, file_label=False)
+                prefixed_name = f"{repo_name}/{file_name}"
+                df = preprocess_file(code, prefixed_name, file_label=False)
                 if len(df) > 0:
                     dfs.append(df)
 
