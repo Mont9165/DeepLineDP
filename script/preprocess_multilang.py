@@ -284,7 +284,10 @@ def preprocess_file(
     if len(code_df) == 0:
         return pd.DataFrame()
 
-    is_test = "test" in filename.lower()
+    # Check only the file path portion (after optional repo_name/ prefix)
+    # to avoid false positives from repository names containing "test"
+    file_part = filename.split("/", 1)[1] if "/" in filename else filename
+    is_test = "test" in file_part.lower()
 
     code_df["filename"] = filename
     code_df["is_test_file"] = is_test

@@ -114,6 +114,55 @@ def train_word2vec(data_dir: str, output_dir: str, embed_dim: int = 50) -> str:
     return save_path
 
 
+def train_shared_word2vec(
+    data_dirs: list,
+    output_dir: str,
+    embed_dim: int = 50,
+) -> str:
+    """Train a shared Word2Vec model from multiple data directories.
+
+    Combines training splits from all provided directories so that cross-domain
+    scenarios share a common vocabulary. This reduces OOV rates when a model
+    trained on one author group is tested on another.
+
+    Word2Vec only learns distributional semantics (token co-occurrence) and does
+    not use bug labels, so sharing the vocabulary across groups does not leak
+    label information.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    save_path = os.path.join(output_dir, f"w2v-{embed_dim}dim.bin")
+
+    if os.path.exists(save_path):
+        print(f"Shared Word2Vec model already exists: {save_path}")
+        return save_path
+
+    print("Training shared Word2Vec model...")
+    all_texts = []
+    dirs_loaded = 0
+    for data_dir in data_dirs:
+        train_path = os.path.join(data_dir, "train.csv")
+        if not os.path.exists(train_path):
+            print(f"  Warning: skipping {data_dir} (no train.csv)")
+            continue
+        train_df = load_split(data_dir, "train")
+        code3d, _ = get_code3d_and_label(train_df, to_lowercase=True)
+        for file_code in code3d:
+            all_texts.extend(file_code)
+        dirs_loaded += 1
+        print(f"  Loaded {data_dir}: {len(code3d)} files")
+
+    if not all_texts:
+        raise ValueError("No training data found in any of the provided directories")
+    if dirs_loaded < 2:
+        print(f"  WARNING: Only {dirs_loaded} directory contributed data. "
+              "The 'shared' model is effectively a single-group model.")
+
+    w2v = Word2Vec(all_texts, vector_size=embed_dim, min_count=1)
+    w2v.save(save_path)
+    print(f"Shared Word2Vec saved: {save_path} (vocab={len(w2v.wv)})")
+    return save_path
+
+
 # ---------------------------------------------------------------------------
 # Model training
 # ---------------------------------------------------------------------------
@@ -411,8 +460,15 @@ def run_pipeline(
     num_epochs: int = 10,
     lr: float = 0.001,
     dropout: float = 0.2,
+    w2v_model: str = "",
 ):
-    """Run the full training pipeline or a specific stage."""
+    """Run the full training pipeline or a specific stage.
+
+    Args:
+        w2v_model: Path to a pre-trained Word2Vec model. If provided, skip
+            W2V training and use this model instead (e.g. a shared model
+            trained on all author groups).
+    """
     if not test_data_dir:
         test_data_dir = data_dir
 
@@ -422,11 +478,16 @@ def run_pipeline(
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    w2v_path = os.path.join(w2v_dir, f"w2v-{embed_dim}dim.bin")
     best_model_path = ""
 
-    if stage in ("all", "w2v"):
+    if w2v_model:
+        w2v_path = w2v_model
+        if stage in ("all", "w2v"):
+            print(f"Using pre-trained Word2Vec: {w2v_model}")
+    elif stage in ("all", "w2v"):
         w2v_path = train_word2vec(data_dir, w2v_dir, embed_dim)
+    else:
+        w2v_path = os.path.join(w2v_dir, f"w2v-{embed_dim}dim.bin")
 
     if stage in ("all", "train"):
         best_model_path = train_model(
@@ -482,6 +543,11 @@ def main():
     parser.add_argument("--num-epochs", type=int, default=10)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--dropout", type=float, default=0.2)
+    parser.add_argument(
+        "--w2v-model",
+        default="",
+        help="Path to pre-trained Word2Vec model (skip W2V training)",
+    )
 
     args = parser.parse_args()
     run_pipeline(
@@ -492,6 +558,7 @@ def main():
         num_epochs=args.num_epochs,
         lr=args.lr,
         dropout=args.dropout,
+        w2v_model=args.w2v_model,
     )
 
 
