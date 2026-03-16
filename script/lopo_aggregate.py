@@ -103,17 +103,15 @@ def _collect_fold_metrics(
             },
         }
 
-        # Collect file-TP gated line-level metrics
-        for gated_key in ("file_tp_gated_default", "file_tp_gated_optimal"):
-            gated = metrics.get(gated_key)
-            if gated and "recall_at_20_pct" in gated:
-                fold_result[gated_key] = {
-                    "recall_at_20_pct": gated.get("recall_at_20_pct"),
-                    "effort_at_20_pct": gated.get("effort_at_20_pct"),
-                    "ifa": gated.get("ifa"),
-                    "n_tp_files": gated.get("n_tp_files", 0),
-                    "threshold": gated.get("threshold"),
-                }
+        # Collect file-TP gated line-level metrics (threshold 0.5 only)
+        gated = metrics.get("file_tp_gated")
+        if gated and "recall_at_20_pct" in gated:
+            fold_result["file_tp_gated"] = {
+                "recall_at_20_pct": gated.get("recall_at_20_pct"),
+                "effort_at_20_pct": gated.get("effort_at_20_pct"),
+                "ifa": gated.get("ifa"),
+                "n_tp_files": gated.get("n_tp_files", 0),
+            }
 
         scenario_results.setdefault(scenario, []).append(fold_result)
 
@@ -175,27 +173,23 @@ def _aggregate_scenario(
 
     aggregated = _aggregate_metric_values(metric_values, n_bootstrap)
 
-    # Aggregate file-TP gated metrics
+    # Aggregate file-TP gated metrics (threshold 0.5 only)
     gated_line_keys = ["recall_at_20_pct", "effort_at_20_pct", "ifa"]
-    gated_aggregations: Dict[str, Any] = {}
+    gated_values: Dict[str, List[float]] = {k: [] for k in gated_line_keys}
+    for fr in fold_results:
+        gated = fr.get("file_tp_gated", {})
+        for k in gated_line_keys:
+            v = gated.get(k)
+            if v is not None:
+                gated_values[k].append(float(v))
 
-    for gated_key in ("file_tp_gated_default", "file_tp_gated_optimal"):
-        gated_values: Dict[str, List[float]] = {k: [] for k in gated_line_keys}
-        for fr in fold_results:
-            gated = fr.get(gated_key, {})
-            for k in gated_line_keys:
-                v = gated.get(k)
-                if v is not None:
-                    gated_values[k].append(float(v))
-
-        if any(gated_values[k] for k in gated_line_keys):
-            gated_aggregations[gated_key] = _aggregate_metric_values(
-                gated_values, n_bootstrap,
-            )
+    gated_agg = None
+    if any(gated_values[k] for k in gated_line_keys):
+        gated_agg = _aggregate_metric_values(gated_values, n_bootstrap)
 
     result = aggregated
-    if gated_aggregations:
-        result["_gated"] = gated_aggregations
+    if gated_agg is not None:
+        result["_gated"] = {"file_tp_gated": gated_agg}
 
     return result
 
