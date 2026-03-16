@@ -229,12 +229,19 @@ def aggregate_lopo_results(
         # Separate gated aggregations from main metrics
         gated = agg.pop("_gated", {})
 
+        # Count TP=0 folds (file-level prediction found no true positives)
+        n_tp_zero = sum(
+            1 for fr in fold_results
+            if fr.get("file_tp_gated", {}).get("n_tp_files", -1) == 0
+        )
+
         scenario_entry = {
             "scenario": scenario_name,
             "n_folds_completed": len(fold_results),
             "n_folds_total": summary["per_scenario"].get(
                 scenario_name, {}
             ).get("total", 0),
+            "n_folds_tp_zero": n_tp_zero,
             "aggregated_metrics": agg,
             "per_fold": fold_results,
         }
