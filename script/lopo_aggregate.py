@@ -66,7 +66,18 @@ def _collect_fold_metrics(
                   f"({scenario}/{test_repo})")
             continue
 
-        pred_df = pd.read_csv(pred_path)
+        if os.path.getsize(pred_path) == 0:
+            print(f"  WARNING: Empty predictions file for fold {fold_id} "
+                  f"({scenario}/{test_repo})")
+            continue
+
+        try:
+            pred_df = pd.read_csv(pred_path)
+        except pd.errors.EmptyDataError:
+            print(f"  WARNING: No data in predictions for fold {fold_id} "
+                  f"({scenario}/{test_repo})")
+            continue
+
         if len(pred_df) == 0:
             print(f"  WARNING: Empty predictions for fold {fold_id}")
             continue
@@ -92,35 +103,30 @@ def _collect_fold_metrics(
             },
         }
 
+        # Collect file-TP gated line-level metrics
+        for gated_key in ("file_tp_gated_default", "file_tp_gated_optimal"):
+            gated = metrics.get(gated_key)
+            if gated and "recall_at_20_pct" in gated:
+                fold_result[gated_key] = {
+                    "recall_at_20_pct": gated.get("recall_at_20_pct"),
+                    "effort_at_20_pct": gated.get("effort_at_20_pct"),
+                    "ifa": gated.get("ifa"),
+                    "n_tp_files": gated.get("n_tp_files", 0),
+                    "threshold": gated.get("threshold"),
+                }
+
         scenario_results.setdefault(scenario, []).append(fold_result)
 
     return scenario_results
 
 
-def _aggregate_scenario(
-    fold_results: List[Dict[str, Any]],
+def _aggregate_metric_values(
+    metric_values: Dict[str, List[float]],
     n_bootstrap: int = 1000,
 ) -> Dict[str, Any]:
-    """Aggregate per-fold metrics into summary statistics for one scenario.
-
-    Computes mean, SD, median, and bootstrap 95% CI for each metric.
-    """
-    metric_keys = [
-        "recall_at_20_pct", "effort_at_20_pct", "ifa",
-        "file_level_auc", "file_level_balanced_accuracy", "file_level_mcc",
-    ]
-
-    # Collect per-repo metric values
-    metric_values: Dict[str, List[float]] = {k: [] for k in metric_keys}
-    for fr in fold_results:
-        for k in metric_keys:
-            v = fr["metrics"].get(k)
-            if v is not None:
-                metric_values[k].append(float(v))
-
+    """Aggregate metric value lists into summary statistics."""
     aggregated: Dict[str, Any] = {}
-    for k in metric_keys:
-        vals = metric_values[k]
+    for k, vals in metric_values.items():
         if not vals:
             aggregated[k] = {
                 "mean": None, "sd": None, "median": None,
@@ -143,6 +149,55 @@ def _aggregate_scenario(
         }
 
     return aggregated
+
+
+def _aggregate_scenario(
+    fold_results: List[Dict[str, Any]],
+    n_bootstrap: int = 1000,
+) -> Dict[str, Any]:
+    """Aggregate per-fold metrics into summary statistics for one scenario.
+
+    Computes mean, SD, median, and bootstrap 95% CI for each metric.
+    Returns dict with 'aggregated_metrics' and optional gated metric aggregations.
+    """
+    metric_keys = [
+        "recall_at_20_pct", "effort_at_20_pct", "ifa",
+        "file_level_auc", "file_level_balanced_accuracy", "file_level_mcc",
+    ]
+
+    # Collect per-repo metric values
+    metric_values: Dict[str, List[float]] = {k: [] for k in metric_keys}
+    for fr in fold_results:
+        for k in metric_keys:
+            v = fr["metrics"].get(k)
+            if v is not None:
+                metric_values[k].append(float(v))
+
+    aggregated = _aggregate_metric_values(metric_values, n_bootstrap)
+
+    # Aggregate file-TP gated metrics
+    gated_line_keys = ["recall_at_20_pct", "effort_at_20_pct", "ifa"]
+    gated_aggregations: Dict[str, Any] = {}
+
+    for gated_key in ("file_tp_gated_default", "file_tp_gated_optimal"):
+        gated_values: Dict[str, List[float]] = {k: [] for k in gated_line_keys}
+        for fr in fold_results:
+            gated = fr.get(gated_key, {})
+            for k in gated_line_keys:
+                v = gated.get(k)
+                if v is not None:
+                    gated_values[k].append(float(v))
+
+        if any(gated_values[k] for k in gated_line_keys):
+            gated_aggregations[gated_key] = _aggregate_metric_values(
+                gated_values, n_bootstrap,
+            )
+
+    result = aggregated
+    if gated_aggregations:
+        result["_gated"] = gated_aggregations
+
+    return result
 
 
 def aggregate_lopo_results(
@@ -177,7 +232,10 @@ def aggregate_lopo_results(
 
         agg = _aggregate_scenario(fold_results, n_bootstrap=n_bootstrap)
 
-        results[scenario_name] = {
+        # Separate gated aggregations from main metrics
+        gated = agg.pop("_gated", {})
+
+        scenario_entry = {
             "scenario": scenario_name,
             "n_folds_completed": len(fold_results),
             "n_folds_total": summary["per_scenario"].get(
@@ -186,6 +244,11 @@ def aggregate_lopo_results(
             "aggregated_metrics": agg,
             "per_fold": fold_results,
         }
+
+        for gated_key, gated_agg in gated.items():
+            scenario_entry[f"aggregated_metrics_{gated_key}"] = gated_agg
+
+        results[scenario_name] = scenario_entry
 
     # Cross-scenario comparison using per-repo metrics
     results["cross_scenario_comparison"] = _cross_scenario_comparison(
