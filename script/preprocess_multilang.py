@@ -87,11 +87,17 @@ _IDENTIFIER_NODE_TYPES = {
 }
 
 
+_LANGUAGE_NAME_MAP = {
+    "c_sharp": "csharp",
+}
+
+
 def _get_language(language_name: str):
     """Load a tree-sitter Language object."""
     try:
         from tree_sitter_language_pack import get_language
-        return get_language(language_name)
+        mapped = _LANGUAGE_NAME_MAP.get(language_name, language_name)
+        return get_language(mapped)
     except Exception:
         return None
 
