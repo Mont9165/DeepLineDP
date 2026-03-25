@@ -70,12 +70,34 @@ _NUMBER_NODE_TYPES = {
     "numeric_literal",
 }
 
+# Tree-sitter node types that represent identifiers (variable names, type
+# names, function names, etc.).  These are abstracted to "SimpleName"
+# following the original DeepLineDP protocol which uses JavaParser's
+# SimpleName node type.
+_IDENTIFIER_NODE_TYPES = {
+    "identifier",
+    "type_identifier",
+    "field_identifier",
+    "property_identifier",
+    "shorthand_property_identifier",
+    "shorthand_property_identifier_pattern",
+    "variable_name",
+    "name",
+    "simple_identifier",
+}
+
+
+_LANGUAGE_NAME_MAP = {
+    "c_sharp": "csharp",
+}
+
 
 def _get_language(language_name: str):
     """Load a tree-sitter Language object."""
     try:
         from tree_sitter_language_pack import get_language
-        return get_language(language_name)
+        mapped = _LANGUAGE_NAME_MAP.get(language_name, language_name)
+        return get_language(mapped)
     except Exception:
         return None
 
@@ -121,11 +143,20 @@ def _replace_ranges(code_bytes: bytes, ranges, replacement: bytes) -> bytes:
 
 def _normalize_line(line: str) -> str:
     """
-    Normalize a preprocessed code line: collapse whitespace, strip punctuation
-    and operators to produce a token sequence.
+    Normalize a preprocessed code line following the original DeepLineDP
+    protocol (Pornprasit & Tantithamthavorn, 2021):
+    1. Protect special tokens (<str>, <num>) from punctuation removal
+    2. Remove punctuation/operators (following Rahman & Rigby)
+    3. Collapse whitespace
     """
-    # Remove common punctuation/operators
-    line = re.sub(r"[.,;:{}()\[\]<>+\-*/=!&|^~%?@#\\]", " ", line)
+    # Protect <str> and <num> tokens from punctuation removal
+    line = line.replace("<str>", "PLACEHOLDER_STR")
+    line = line.replace("<num>", "PLACEHOLDER_NUM")
+    # Remove common punctuation/operators (following Rahman & Rigby [52])
+    line = re.sub(r"[.,;:{}()\[\]<>+\-*/=!&|^~%?@#\\'\"]", " ", line)
+    # Restore protected tokens
+    line = line.replace("PLACEHOLDER_STR", "<str>")
+    line = line.replace("PLACEHOLDER_NUM", "<num>")
     # Collapse whitespace
     line = re.sub(r"\s+", " ", line).strip()
     return line
@@ -177,14 +208,20 @@ def tokenize_with_treesitter(
             for line_no in range(start_line, end_line + 1):
                 comment_lines.add(line_no)
 
-        # Collect all literal ranges from the original AST before any
-        # modifications, then replace in a single end-to-start pass so
-        # byte offsets stay valid.
+        # Collect all literal and identifier ranges from the original AST
+        # before any modifications, then replace in a single end-to-start
+        # pass so byte offsets stay valid.
+        # Following the original DeepLineDP protocol:
+        #   - String literals → <str>
+        #   - Numeric literals → <num>
+        #   - Identifiers → SimpleName
         string_ranges = _collect_node_ranges(root, _STRING_NODE_TYPES)
         number_ranges = _collect_node_ranges(root, _NUMBER_NODE_TYPES)
+        identifier_ranges = _collect_node_ranges(root, _IDENTIFIER_NODE_TYPES)
 
         tagged_ranges = [(s, e, b"<str>") for s, e in string_ranges]
         tagged_ranges += [(s, e, b"<num>") for s, e in number_ranges]
+        tagged_ranges += [(s, e, b"SimpleName") for s, e in identifier_ranges]
         # Sort end-to-start so replacements don't shift earlier offsets
         tagged_ranges.sort(key=lambda r: r[0], reverse=True)
 
@@ -284,7 +321,10 @@ def preprocess_file(
     if len(code_df) == 0:
         return pd.DataFrame()
 
-    is_test = "test" in filename.lower()
+    # Check only the file path portion (after optional repo_name/ prefix)
+    # to avoid false positives from repository names containing "test"
+    file_part = filename.split("/", 1)[1] if "/" in filename else filename
+    is_test = "test" in file_part.lower()
 
     code_df["filename"] = filename
     code_df["is_test_file"] = is_test
