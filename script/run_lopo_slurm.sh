@@ -2,10 +2,10 @@
 #SBATCH --job-name=lopo-fold
 #SBATCH --partition=gpu_short
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=4
 #SBATCH --mem=64G
-#SBATCH --time=01:00:00
-#SBATCH --output=/work/kosei-ho/LLM4SZZ/DeepLineDP/script/lopo_logs/fold_%a_%j.log
+#SBATCH --time=04:00:00
+#SBATCH --output=lopo_logs/fold_%a_%j.log
 #
 # LOPO fold job array for RQ3.
 #
@@ -22,8 +22,8 @@
 
 set -e
 
-VENV=/work/kosei-ho/LLM4SZZ/DeepLineDP/.venv/bin/python
-SCRIPT_DIR=/work/kosei-ho/LLM4SZZ/DeepLineDP/script
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+VENV="${SCRIPT_DIR}/../../.venv/bin/python"
 
 # Defaults
 MANIFEST=${LOPO_MANIFEST:-${SCRIPT_DIR}/../output/lopo/manifest.json}
@@ -51,7 +51,7 @@ CMD="${VENV} ${SCRIPT_DIR}/lopo_run_fold.py \
     --num-epochs ${EPOCHS}"
 
 if [ -n "${W2V_MODEL}" ]; then
-    CMD="${CMD} --w2v-model ${W2V_MODEL}"
+  CMD="${CMD} --w2v-model ${W2V_MODEL}"
 fi
 
 echo "Running: ${CMD}"
