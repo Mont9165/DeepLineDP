@@ -82,7 +82,26 @@ def _collect_fold_metrics(
             print(f"  WARNING: Empty predictions for fold {fold_id}")
             continue
 
-        metrics = compute_line_level_metrics(pred_df)
+        # Determine threshold from eval (validation) predictions if available
+        eval_pred_path = os.path.join(
+            output_dir, "folds", scenario, repo_slug,
+            "predictions", "eval_predictions.csv",
+        )
+        eval_threshold = None
+        if os.path.exists(eval_pred_path):
+            try:
+                eval_df = pd.read_csv(eval_pred_path)
+                if len(eval_df) >= 2:
+                    from analyze_rq3_line import _find_optimal_threshold
+                    eval_y_true = eval_df["file-level-ground-truth"].values.astype(int)
+                    eval_y_score = eval_df["prediction-prob"].values
+                    if len(np.unique(eval_y_true)) >= 2:
+                        diag = _find_optimal_threshold(eval_y_true, eval_y_score)
+                        eval_threshold = diag.get("optimal_threshold", None)
+            except Exception:
+                pass  # Fall back to test-set optimal
+
+        metrics = compute_line_level_metrics(pred_df, eval_threshold=eval_threshold)
         if "error" in metrics:
             print(f"  WARNING: Fold {fold_id} error: {metrics['error']}")
             continue
