@@ -22,8 +22,11 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-VENV="${SCRIPT_DIR}/../../.venv/bin/python"
+# NOTE: under SLURM, $0 is the spooled copy (/var/spool/slurmd/jobNNN/slurm_script),
+# so $0-relative paths break. Honor explicit overrides (set by the launcher), with a
+# $0-relative fallback for direct (non-SLURM) invocation.
+SCRIPT_DIR="${LOPO_SCRIPT_DIR:-$(cd "$(dirname "$0")" && pwd)}"
+VENV="${LOPO_PYTHON:-${SCRIPT_DIR}/../../.venv/bin/python}"
 
 # Defaults
 MANIFEST=${LOPO_MANIFEST:-${SCRIPT_DIR}/../output/lopo/manifest.json}
