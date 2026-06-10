@@ -34,7 +34,10 @@ OUTPUT_DIR=${LOPO_OUTPUT:-${SCRIPT_DIR}/../output/lopo}
 W2V_MODEL=${LOPO_W2V:-""}
 EPOCHS=${LOPO_EPOCHS:-10}
 
-FOLD_ID=${SLURM_ARRAY_TASK_ID}
+# Fold id = array task id + offset. The offset lets a chunk of folds with ids
+# above SLURM's MaxArraySize (e.g. 2880-3866) be submitted as 0-based array
+# indices. Defaults to 0, so direct (offset-less) submission is unchanged.
+FOLD_ID=$(( SLURM_ARRAY_TASK_ID + ${LOPO_FOLD_OFFSET:-0} ))
 
 echo "=== LOPO Fold ${FOLD_ID} ==="
 echo "Job ID: ${SLURM_JOB_ID}, Array Task: ${SLURM_ARRAY_TASK_ID}"
