@@ -1,2 +1,7 @@
 /datasets
 /output
+.venv/
+__pycache__/
+*.pyc
+lopo_logs/
+*.log

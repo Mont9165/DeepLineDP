@@ -109,8 +109,12 @@ class SentenceAttention(nn.Module):
 
         sents = self.dropout(sents)
 
-        # Sentence-level GRU over sentence embeddings
-        packed_sents, _ = self.gru(PackedSequence(sents, valid_bsz))
+        # Sentence-level GRU over sentence embeddings.
+        # cuDNN's GRU requires a contiguous input; the word-attention output `sents`
+        # can be non-contiguous, which on large repos (e.g. microsoft/TypeScript)
+        # triggered "cuDNN error: CUDNN_STATUS_NOT_SUPPORTED ... non-contiguous input".
+        # .contiguous() is a no-op when already contiguous, so it is numerically safe.
+        packed_sents, _ = self.gru(PackedSequence(sents.contiguous(), valid_bsz))
 
         if self.use_layer_norm:
             normed_sents = self.layer_norm(packed_sents.data)
