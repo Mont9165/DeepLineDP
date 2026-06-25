@@ -71,6 +71,12 @@ Our repository contains the following directory
 
 ## Environment Setup
 
+> **For the agent-vs-human-bugs study, do NOT follow this section.** The fork's environment is the
+> parent repository's: `uv sync --group deeplinedp` (Python 3.12) — see the fork notice at the top, and
+> clone via `git clone --recurse-submodules` of the parent, not this repo standalone. The conda /
+> `requirements.yml` / `DeepLineDP_env` / `./datasets/original/` instructions below are the **original
+> upstream** workflow for the 9-project Java benchmark, kept for reference only (our RQ3 builds its
+> datasets from LLM4SZZ output via `script/build_dataset_from_llm4szz.py`).
 
 ### Python Environment Setup
 1. clone the github repository by using the following command:
