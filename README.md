@@ -1,3 +1,28 @@
+> **Fork notice.** This is a fork of [DeepLineDP](https://github.com/awsm-research/DeepLineDP)
+> (Pornprasit & Tantithamthavorn, TSE 2023), extended for the empirical study
+> **agent-vs-human-bugs** — *"Do AI Coding Agents Introduce Different Bugs than Humans?"*.
+> In that study (RQ3) DeepLineDP is used as an off-the-shelf line-level defect-prediction model
+> under a **leave-one-project-out (LOPO), cross-domain** protocol (agent vs. human code), **not** the
+> original within-release Java workflow documented below.
+>
+> ### Reproducing RQ3
+> Follow the **parent repository's** README, not this one:
+> <https://github.com/Mont9165/agent-vs-human-bugs> (section *"Step 4 — RQ3: Defect predictability"*).
+> The LOPO pipeline is driven from the parent and the environment is managed by its `uv` setup.
+>
+> ### Fork additions (branch `fix/python312-compat`)
+> - **Multi-language support** via tree-sitter (13 languages), replacing the original Java-only parsing.
+> - **LOPO cross-domain pipeline** in `script/`: `build_dataset_from_llm4szz.py` (build agent/human/mixed
+>   datasets from LLM4SZZ output), `lopo_generate_folds.py` (fold manifest), `lopo_run_fold.py` +
+>   `train_pipeline.py` (per-fold train+predict, with a single shared Word2Vec embedding),
+>   `generate_eval_predictions.py` (per-fold threshold on the eval split), and `lopo_aggregate.py`
+>   (per-scenario metric aggregation: AUC, Recall@20%, Effort@20%, IFA).
+> - **Python 3.12 / `uv`** compatibility and SLURM/H100 LOPO drivers.
+>
+> The original DeepLineDP documentation (Java releases, conda, within-release/cross-project, RQ1–RQ4) is
+> preserved below for reference and attribution.
+
+---
 
 # Supplementary Materials for "DeepLineDP: Towards a Deep Learning Approach for Line-Level Defect Prediction"
   
