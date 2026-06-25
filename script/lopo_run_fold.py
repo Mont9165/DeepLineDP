@@ -269,15 +269,31 @@ def run_fold(
             w2v_model=w2v_model,
         )
     else:
-        # Full training + prediction
-        run_pipeline(
-            data_dir=fold_data_dir,
-            output_base=fold_output_dir,
-            test_data_dir=fold_data_dir,
-            stage="all",
-            num_epochs=num_epochs,
-            w2v_model=w2v_model,
-        )
+        # If a fully-trained model already exists (final-epoch checkpoint), the
+        # earlier run only failed at the PREDICT step (e.g. cuDNN on a large repo
+        # before the .contiguous() fix). Skip the expensive retrain and re-predict.
+        final_ckpt = os.path.join(
+            fold_output_dir, "model", f"checkpoint_{num_epochs}epochs.pth")
+        if os.path.exists(final_ckpt):
+            print(f"  Fold {fold_id}: trained model present ({final_ckpt}); "
+                  f"predict-only (skipping retrain).")
+            run_pipeline(
+                data_dir=fold_data_dir,
+                output_base=fold_output_dir,
+                test_data_dir=fold_data_dir,
+                stage="predict",
+                w2v_model=w2v_model,
+            )
+        else:
+            # Full training + prediction
+            run_pipeline(
+                data_dir=fold_data_dir,
+                output_base=fold_output_dir,
+                test_data_dir=fold_data_dir,
+                stage="all",
+                num_epochs=num_epochs,
+                w2v_model=w2v_model,
+            )
 
 
 def main():

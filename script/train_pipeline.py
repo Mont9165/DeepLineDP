@@ -365,6 +365,12 @@ def generate_predictions(
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    # Prediction feeds whole files (uncapped) through the GRU; very long sequences
+    # (huge files, e.g. microsoft/TypeScript) make cuDNN's GRU raise
+    # CUDNN_STATUS_NOT_SUPPORTED even with a contiguous input. The native (non-cuDNN)
+    # GRU has no such length limit, so disable cuDNN for the prediction pass.
+    torch.backends.cudnn.enabled = False
+
     os.makedirs(output_dir, exist_ok=True)
 
     # Load Word2Vec
